@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieGlitz</title>
+    <style>
+        * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: rgb(24, 24, 24);
+}
+
+nav {
+    padding: 10px;
+    height: 75px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 28px;
+    background-color: black;
+    color: whitesmoke;
+}
+
+.logo {
+    display: flex;
+}
+
+.pre {
+    color: goldenrod;
+}
+
+.search {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+input {
+    width: 400px;
+    height: 30px;
+    border-radius: 10px;
+    outline: none;
+}
+
+button {
+    background-color: goldenrod;
+    font-size: 16px;
+    width: 100px;
+    height: 30px;
+    border-radius: 10px;
+    outline: none;
+}
+
+hr {
+    border: none;
+    border-top: 2px solid goldenrod;
+}
+
+main {
+    height: calc(100vh - 75px);
+    background-color: black;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* Style for the movie result division */
+.movie-result {
+    display: flex;
+    align-items: flex-start;
+    margin: 20px 0;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 8px;
+    width: 80%;
+    background-color: #333;
+}
+
+/* Style for the movie poster */
+.movie-poster {
+    max-width: 150px;
+    margin-right: 20px;
+}
+
+/* Style for the movie info */
+.movie-info {
+    flex-grow: 1;
+}
+
+
+#pagination button {
+    background-color: goldenrod;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    margin: 0 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+#pagination button:hover {
+    background-color: #d4a017;
+}
+#pagination .active {
+    background-color: #d4a017;
+    color: black;
+}
+
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">
+            <div class="pre">Movie</div>
+            <div class="post">Glitz</div>
+        </div>
+        <div class="search">
+            <form action="/search" method="GET" id="searchForm">
+                <input type="search" id="search" name="q" placeholder="Search Something Here">
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </nav>
+    <hr>
+    <main id="display">
+        <!-- This is the main display of results. -->
+    </main>
+    <div id="pagination" style="text-align:center; margin:20px 0;"></div>
+    <script>const apiKey = `af7edb53`;
+        let dataReq = `http://www.omdbapi.com/?apikey=${apiKey}&s=`;
+        let detailReq = `http://www.omdbapi.com/?apikey=${apiKey}&i=`;
+        
+        async function fetchMovieData(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('There has been a problem with your fetch operation:', error);
+            }
+        }
+        
+        document.getElementById('searchForm').addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevent the form from submitting in the traditional way
+            const searchQuery = document.getElementById('search').value;
+            if (!searchQuery) {
+                alert('Search field is required!');
+            } else {
+                const url = new URL(window.location);
+                url.searchParams.set('q', searchQuery);
+                url.searchParams.set('page', 1);
+                window.history.pushState({}, '', url);
+                await performSearch(searchQuery, 1);
+            }
+        });
+        
+        async function performSearch(query, page) {
+            const movieList = await fetchMovieData(`${dataReq}${query}&page=${page}`);
+            if (movieList && movieList.Search) {
+                const display = document.getElementById('display');
+                display.innerHTML = ''; // Clear previous results
+        
+                for (const movie of movieList.Search) {
+                    const movieDetails = await fetchMovieData(detailReq + movie.imdbID);
+                    if (movieDetails) {
+                        const movieDiv = document.createElement('div');
+                        movieDiv.classList.add('movie-result');
+        
+                        const posterImg = document.createElement('img');
+                        posterImg.src = movieDetails.Poster;
+                        posterImg.alt = movieDetails.Title + ' Poster';
+                        posterImg.classList.add('movie-poster');
+        
+                        const infoDiv = document.createElement('div');
+                        infoDiv.classList.add('movie-info');
+                        infoDiv.innerHTML = `
+                            <h2>${movieDetails.Title}</h2>
+                            <p><strong>Year:</strong> ${movieDetails.Year}</p>
+                            <p><strong>Genre:</strong> ${movieDetails.Genre}</p>
+                            <p><strong>Director:</strong> ${movieDetails.Director}</p>
+                            <p><strong>Cast:</strong> ${movieDetails.Actors}</p>
+                            <p><strong>Plot:</strong> ${movieDetails.Plot}</p>
+                        `;
+        
+                        movieDiv.appendChild(posterImg);
+                        movieDiv.appendChild(infoDiv);
+                        display.appendChild(movieDiv);
+                    }
+                }
+        
+                setupPagination(query, page, movieList.totalResults);
+            }
+        }
+        
+        function setupPagination(query, currentPage, totalResults) {
+            const paginationDiv = document.getElementById('pagination');
+            paginationDiv.innerHTML = ''; // Clear previous pagination
+        
+            const totalPages = Math.ceil(totalResults / 10);
+            const maxVisiblePages = 4;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+            if (currentPage > 1) {
+                const prevButton = document.createElement('button');
+                prevButton.innerText = '<<';
+                prevButton.addEventListener('click', () => {
+                    const url = new URL(window.location);
+                    url.searchParams.set('q', query);
+                    url.searchParams.set('page', currentPage - 1);
+                    window.history.pushState({}, '', url);
+                    performSearch(query, currentPage - 1);
+                });
+                paginationDiv.appendChild(prevButton);
+            }
+        
+            for (let i = startPage; i <= endPage; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.innerText = i;
+                if (i === currentPage) {
+                    pageButton.classList.add('active');
+                }
+                pageButton.addEventListener('click', () => {
+                    const url = new URL(window.location);
+                    url.searchParams.set('q', query);
+                    url.searchParams.set('page', i);
+                    window.history.pushState({}, '', url);
+                    performSearch(query, i);
+                });
+                paginationDiv.appendChild(pageButton);
+            }
+        
+            if (currentPage < totalPages) {
+                const nextButton = document.createElement('button');
+                nextButton.innerText = '>>';
+                nextButton.addEventListener('click', () => {
+                    const url = new URL(window.location);
+                    url.searchParams.set('q', query);
+                    url.searchParams.set('page', currentPage + 1);
+                    window.history.pushState({}, '', url);
+                    performSearch(query, currentPage + 1);
+                });
+                paginationDiv.appendChild(nextButton);
+            }
+        }
+        
+        // Handle URL parameters
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const query = urlParams.get('q');
+            const page = parseInt(urlParams.get('page')) || 1;
+        
+            if (query) {
+                document.getElementById('search').value = query;
+                await performSearch(query, page);
+            }
+        });
+        </script>
+</body>
+</html>
